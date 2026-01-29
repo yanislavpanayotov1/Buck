@@ -417,3 +417,109 @@ app.get('/screen-time/top-apps', async (req, res) => {
     res.status(500).json({ ok: false, error: err.message });
   }
 });
+
+app.post('/blocks', async (req, res) => {
+  const userId = req.user.id;
+  const {
+    app_package,
+    start_time,   // ISO string or timestamp
+    end_time,
+    duration_minutes,
+    strict = false,
+    task_required = true
+  } = req.body;
+
+  try {
+    const result = await db.query(
+      `INSERT INTO blocks
+        (user_id, app_package, start_time, end_time, duration_minutes, strict, task_required, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'active')
+       RETURNING id, status`,
+      [userId, app_package, start_time, end_time, duration_minutes, strict, task_required]
+    );
+
+    res.json({ ok: true, block: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/blocks/active', async (req, res) => {
+  const userId = req.user.id;
+
+  try {
+    const result = await db.query(
+      `SELECT id, app_package, start_time, end_time, duration_minutes, strict, task_required
+       FROM blocks
+       WHERE user_id = $1 AND status = 'active'
+       ORDER BY start_time ASC`,
+      [userId]
+    );
+
+    res.json({ ok: true, blocks: result.rows });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/blocks/history', async (req, res) => {
+  const userId = req.user.id;
+
+  try {
+    const result = await db.query(
+      `SELECT id, app_package, start_time, end_time, duration_minutes, status
+       FROM blocks
+       WHERE user_id = $1 AND status != 'active'
+       ORDER BY start_time DESC`,
+      [userId]
+    );
+
+    res.json({ ok: true, blocks: result.rows });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.delete('/blocks/:id', async (req, res) => {
+  const userId = req.user.id;
+  const blockId = req.params.id;
+
+  try {
+    // Only allow cancel if block is active and not started yet
+    const result = await db.query(
+      `UPDATE blocks
+       SET status = 'cancelled'
+       WHERE id = $1 AND user_id = $2 AND start_time > NOW() AND status = 'active'
+       RETURNING id, status`,
+      [blockId, userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({ ok: false, error: 'Block cannot be cancelled' });
+    }
+
+    res.json({ ok: true, block: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/blocks/:id/override-request', async (req, res) => {
+  const userId = req.user.id;
+  const blockId = req.params.id;
+  const { reason } = req.body;
+
+  try {
+    const result = await db.query(
+      `INSERT INTO override_requests
+       (block_id, user_id, reason, status)
+       VALUES ($1,$2,$3,'pending')
+       RETURNING id, status`,
+      [blockId, userId, reason]
+    );
+
+    res.json({ ok: true, override_request: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
