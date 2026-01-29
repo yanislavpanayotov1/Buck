@@ -523,3 +523,107 @@ app.post('/blocks/:id/override-request', async (req, res) => {
     res.status(500).json({ ok: false, error: err.message });
   }
 });
+
+app.post('/tasks/generate', async (req, res) => {
+  const userId = req.user.id;
+  const { block_id, task_type, difficulty, payload, pass_criteria, expires_at } = req.body;
+
+  try {
+    const result = await db.query(
+      `INSERT INTO tasks
+        (block_id, user_id, task_type, difficulty, payload, pass_criteria, expires_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)
+       RETURNING id, block_id, task_type, difficulty, payload, pass_criteria, expires_at`,
+      [block_id, userId, task_type, difficulty, payload, pass_criteria, expires_at]
+    );
+
+    res.json({ ok: true, task: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/tasks/:id', async (req, res) => {
+  const userId = req.user.id;
+  const taskId = req.params.id;
+
+  try {
+    const result = await db.query(
+      `SELECT id, block_id, task_type, difficulty, payload, pass_criteria, expires_at
+       FROM tasks
+       WHERE id = $1 AND user_id = $2`,
+      [taskId, userId]
+    );
+
+    if (!result.rows.length) return res.status(404).json({ ok: false, error: "Task not found" });
+
+    res.json({ ok: true, task: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/tasks/:id/submit', async (req, res) => {
+  const userId = req.user.id;
+  const taskId = req.params.id;
+  const { submission } = req.body; // JSON payload from client
+
+  try {
+    const taskResult = await db.query(
+      `SELECT block_id, pass_criteria FROM tasks WHERE id = $1 AND user_id = $2`,
+      [taskId, userId]
+    );
+    if (!taskResult.rows.length) return res.status(404).json({ ok: false, error: "Task not found" });
+
+    const { block_id, pass_criteria } = taskResult.rows[0];
+
+    // AI / Validation logic (stub)
+    const passed = await validateTask(submission, pass_criteria);
+
+    await db.query(
+      `INSERT INTO task_submissions (task_id, user_id, submission, passed, graded_at)
+       VALUES ($1,$2,$3,$4,NOW())`,
+      [taskId, userId, submission, passed]
+    );
+
+    // Optionally mark block as completed/unlocked if task required
+    if (passed) {
+      await db.query(
+        `UPDATE blocks SET status = 'active' WHERE id = $1 AND user_id = $2 AND task_required = TRUE`,
+        [block_id, userId]
+      );
+    }
+
+    res.json({ ok: true, passed });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Simple stub AI validator (replace with real AI integration later)
+async function validateTask(submission, passCriteria) {
+  // Example: check if all keywords are in user submission
+  if (!submission.answer) return false;
+  const text = submission.answer.toLowerCase();
+  return passCriteria.keywords.every(k => text.includes(k.toLowerCase()));
+}
+
+app.get('/tasks/due', async (req, res) => {
+  const userId = req.user.id;
+
+  try {
+    const result = await db.query(
+      `SELECT t.id, t.block_id, t.task_type, t.payload, t.expires_at
+       FROM tasks t
+       LEFT JOIN task_submissions s ON t.id = s.task_id AND t.user_id = s.user_id
+       WHERE t.user_id = $1 AND s.id IS NULL AND (t.expires_at IS NULL OR t.expires_at > NOW())
+       ORDER BY t.expires_at ASC`,
+      [userId]
+    );
+
+    res.json({ ok: true, tasks: result.rows });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
