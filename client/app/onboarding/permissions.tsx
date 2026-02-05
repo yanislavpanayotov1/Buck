@@ -10,9 +10,8 @@ export default function PermissionsScreen() {
     const router = useRouter();
 
     const handleContinue = () => {
-        // In a real app, this would trigger the actual permission request.
-        // For now, we simulate success and move to focus.
-        router.replace("/focus");
+        // For now, we simulate success and move to commitment.
+        router.replace("/onboarding/commitment");
     };
 
     return (
