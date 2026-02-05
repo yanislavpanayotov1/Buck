@@ -6,14 +6,18 @@ import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { HapticButton } from "../../components/ui/HapticButton";
 import { WheelPicker } from "../../components/ui/WheelPicker";
 
+import { useOnboarding } from "../../context/OnboardingContext";
+
 // Generate ages 10 to 100
 const AGES = Array.from({ length: 91 }, (_, i) => (i + 10).toString());
 
 export default function AgeScreen() {
     const router = useRouter();
-    const [selectedAge, setSelectedAge] = useState("24"); // Default around 24
+    const { age, setAge } = useOnboarding();
+    const [selectedAge, setSelectedAge] = useState(age.toString());
 
     const handleContinue = () => {
+        setAge(parseInt(selectedAge));
         console.log("User age:", selectedAge);
         router.push("/onboarding/processing"); // Go to processing screen first
     };

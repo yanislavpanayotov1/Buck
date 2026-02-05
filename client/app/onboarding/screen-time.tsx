@@ -6,13 +6,16 @@ import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { CustomSlider } from "../../components/ui/CustomSlider";
 import { HapticButton } from "../../components/ui/HapticButton";
 
+import { useOnboarding } from "../../context/OnboardingContext";
+
 export default function ScreenTimeScreen() {
     const router = useRouter();
-    const [hours, setHours] = useState(4);
+    const { screenTime, setScreenTime } = useOnboarding();
+    const [localHours, setLocalHours] = useState(screenTime);
 
     const handleContinue = () => {
-        // For now, refine later to save to context/storage
-        console.log("User spends", hours, "hours on phone");
+        setScreenTime(localHours);
+        console.log("User spends", localHours, "hours on phone");
         router.push("/onboarding/habits"); // Temporary destination
     };
 
@@ -30,7 +33,7 @@ export default function ScreenTimeScreen() {
             <Animated.View entering={FadeInDown.delay(400)} className="w-full items-center">
                 {/* Dynamic Value Display */}
                 <View className="mb-12 items-center">
-                    <Text className="text-white text-8xl font-bold tracking-tighter">{hours}</Text>
+                    <Text className="text-white text-8xl font-bold tracking-tighter">{localHours}</Text>
                     <Text className="text-neutral-400 text-xl font-medium">Hours</Text>
                 </View>
 
@@ -38,8 +41,8 @@ export default function ScreenTimeScreen() {
                 <CustomSlider
                     min={1}
                     max={12}
-                    initialValue={hours}
-                    onChange={setHours}
+                    initialValue={localHours}
+                    onChange={setLocalHours}
                 />
             </Animated.View>
 
