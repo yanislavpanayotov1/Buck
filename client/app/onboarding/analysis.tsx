@@ -133,7 +133,7 @@ export default function AnalysisScreen() {
         if (currentSlideIndex < slides.length - 1) {
             setCurrentSlideIndex(currentSlideIndex + 1);
         } else {
-            router.replace("/focus");
+            router.replace("/onboarding/permissions");
         }
     };
 
