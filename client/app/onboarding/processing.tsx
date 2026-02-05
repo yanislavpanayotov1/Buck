@@ -43,7 +43,7 @@ export default function ProcessingScreen() {
             // Pause 500ms, then go to 100% and finish
             withDelay(500, withTiming(100, { duration: 500, easing: Easing.bezier(0.25, 0.1, 0.25, 1) }, (finished) => {
                 if (finished) {
-                    runOnJS(router.replace)("/focus");
+                    runOnJS(router.replace)("/onboarding/analysis");
                 }
             }))
         );
