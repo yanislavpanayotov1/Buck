@@ -4,6 +4,15 @@ const db = require('./db/db')
 require('dotenv').config()
 const pool = db.pool
 
+app.use(express.json());
+
+// Mock Auth Middleware for MVP/Dev
+app.use((req, res, next) => {
+  // Use Alice's ID from test_data_mvp.sql
+  req.user = { id: '11111111-1111-1111-1111-111111111111', email: 'alice@test.com' };
+  next();
+});
+
 const port = process.env.PORT || 3000
 
 app.get('/', (req, res) => {
@@ -17,9 +26,9 @@ app.listen(port, () => {
 app.get('/test-db', async (req, res) => {
   try {
     const result = await pool.query('SELECT NOW()');
-    res.json({ 
-      message: 'Database connected!', 
-      timestamp: result.rows[0].now 
+    res.json({
+      message: 'Database connected!',
+      timestamp: result.rows[0].now
     });
   } catch (err) {
     console.error(err);
@@ -308,6 +317,17 @@ app.post('/screen-time/report', async (req, res) => {
   try {
     await client.query('BEGIN');
 
+    // Lookup device UUID from the string ID
+    const deviceRes = await client.query(
+      `SELECT id FROM devices WHERE user_id = $1 AND device_id = $2`,
+      [userId, device_id]
+    );
+
+    if (deviceRes.rows.length === 0) {
+      throw new Error(`Device not found: ${device_id}`);
+    }
+    const deviceUuid = deviceRes.rows[0].id;
+
     // Insert or update daily aggregate
     const { rows } = await client.query(
       `INSERT INTO screen_time_daily
@@ -316,7 +336,7 @@ app.post('/screen-time/report', async (req, res) => {
        ON CONFLICT (user_id, device_id, date)
        DO UPDATE SET total_minutes = EXCLUDED.total_minutes
        RETURNING id`,
-      [userId, device_id, date, total_minutes]
+      [userId, deviceUuid, date, total_minutes]
     );
 
     const dailyId = rows[0].id;
